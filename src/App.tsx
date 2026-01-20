@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useAuthStore } from "./stores/authStore";
 import { useThemeStore } from "./stores/themeStore";
 import { useEffect } from "react";
+import { Toaster } from "./components/ui/toaster";
 
 // Layouts
 import DashboardLayout from "./layouts/DashboardLayout";
@@ -21,6 +22,10 @@ import OrderDetailsPage from "./pages/orders/OrderDetailsPage";
 import InventoryPage from "./pages/inventory/InventoryPage";
 import AnalyticsPage from "./pages/analytics/AnalyticsPage";
 import SettingsPage from "./pages/settings/SettingsPage";
+import FinancesPage from "./pages/finances/FinancesPage";
+import ReportsPage from "./pages/reports/ReportsPage";
+import NotificationsPage from "./pages/notifications/NotificationsPage";
+import SupportPage from "./pages/support/SupportPage";
 
 // Create a client
 const queryClient = new QueryClient({
@@ -75,12 +80,17 @@ function App() {
             <Route path="orders/:orderId" element={<OrderDetailsPage />} />
             <Route path="inventory" element={<InventoryPage />} />
             <Route path="analytics" element={<AnalyticsPage />} />
+            <Route path="finances" element={<FinancesPage />} />
+            <Route path="reports" element={<ReportsPage />} />
+            <Route path="notifications" element={<NotificationsPage />} />
+            <Route path="support" element={<SupportPage />} />
             <Route path="settings" element={<SettingsPage />} />
           </Route>
 
           {/* Catch all */}
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Routes>
+        <Toaster />
       </BrowserRouter>
     </QueryClientProvider>
   );

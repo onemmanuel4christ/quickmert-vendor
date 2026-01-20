@@ -198,13 +198,16 @@ export const mockOrders: Order[] = [
     discount: 0,
     total: 16.72,
     status: "pending",
+    priority: "high",
     paymentMethod: "card",
     paymentStatus: "paid",
     deliveryAddress: "456 Oak Avenue, Apt 3B, NY 10002",
     notes: "Please ring the doorbell twice",
     vendorId: "vendor-1",
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString(),
+    estimatedPrepTime: 15,
+    slaTime: 20,
+    createdAt: new Date(Date.now() - 180000).toISOString(), // 3 mins ago
+    updatedAt: new Date(Date.now() - 180000).toISOString(),
   },
   {
     id: "order-2",
@@ -240,10 +243,15 @@ export const mockOrders: Order[] = [
     discount: 0,
     total: 19.46,
     status: "preparing",
+    priority: "normal",
     paymentMethod: "card",
     paymentStatus: "paid",
     deliveryAddress: "789 Pine Street, NY 10003",
     vendorId: "vendor-1",
+    estimatedPrepTime: 15,
+    slaTime: 20,
+    acceptedAt: new Date(Date.now() - 1200000).toISOString(), // 20 mins ago
+    prepStartedAt: new Date(Date.now() - 900000).toISOString(), // 15 mins ago
     createdAt: new Date(Date.now() - 1800000).toISOString(), // 30 mins ago
     updatedAt: new Date(Date.now() - 600000).toISOString(), // 10 mins ago
   },
@@ -273,10 +281,17 @@ export const mockOrders: Order[] = [
     discount: 0,
     total: 17.28,
     status: "ready",
+    priority: "normal",
     paymentMethod: "cash",
     paymentStatus: "pending",
     deliveryAddress: "321 Maple Drive, NY 10004",
     vendorId: "vendor-1",
+    estimatedPrepTime: 10,
+    slaTime: 20,
+    acceptedAt: new Date(Date.now() - 3300000).toISOString(),
+    prepStartedAt: new Date(Date.now() - 3000000).toISOString(),
+    readyAt: new Date(Date.now() - 300000).toISOString(),
+    actualPrepTime: 5,
     createdAt: new Date(Date.now() - 3600000).toISOString(), // 1 hour ago
     updatedAt: new Date(Date.now() - 300000).toISOString(), // 5 mins ago
   },

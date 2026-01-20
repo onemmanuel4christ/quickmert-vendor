@@ -9,6 +9,14 @@ export interface Vendor {
   avatar?: string;
   isActive: boolean;
   createdAt: string;
+  // KYC fields
+  firstName?: string;
+  lastName?: string;
+  dateOfBirth?: string;
+  nationality?: string;
+  kycStatus?: "pending" | "verified" | "rejected";
+  kycSubmittedAt?: string;
+  kycVerifiedAt?: string;
 }
 
 export interface AuthResponse {
@@ -132,13 +140,14 @@ export interface Order {
   createdAt: string;
   updatedAt: string;
   estimatedDeliveryTime?: string;
-  estimatedPrepTime?: number; // in minutes
-  actualPrepTime?: number; // in minutes
+  estimatedPrepTime?: number; // in minutes (e.g., 15, 30)
+  actualPrepTime?: number; // in minutes - calculated when completed
   acceptedAt?: string;
   prepStartedAt?: string;
   readyAt?: string;
   completedAt?: string;
   timeline?: OrderTimeline[];
+  slaTime?: number; // SLA time in minutes (e.g., 20 for 20min quick commerce)
 }
 
 // Inventory Types
@@ -227,6 +236,90 @@ export interface StoreSettings {
   currency: string;
 }
 
+// KYC & Business Verification Types
+export interface BusinessInfo {
+  businessName: string;
+  businessType:
+    | "sole_proprietor"
+    | "partnership"
+    | "limited_company"
+    | "cooperative";
+  registrationNumber?: string;
+  taxIdNumber?: string;
+  cacNumber?: string; // Corporate Affairs Commission (Nigeria)
+  registrationDate?: string;
+  businessAddress: string;
+  businessCity: string;
+  businessState: string;
+  businessZipCode: string;
+}
+
+export interface BankAccount {
+  id: string;
+  bankName: string;
+  accountNumber: string;
+  accountName: string;
+  bankCode?: string;
+  isPrimary: boolean;
+  isVerified: boolean;
+  currency: string;
+}
+
+export interface IdentityDocument {
+  id: string;
+  type: "national_id" | "passport" | "drivers_license" | "voters_card";
+  documentNumber: string;
+  documentUrl?: string;
+  frontImageUrl?: string;
+  backImageUrl?: string;
+  issueDate?: string;
+  expiryDate?: string;
+  isVerified: boolean;
+}
+
+export interface BusinessDocument {
+  id: string;
+  type:
+    | "cac_certificate"
+    | "tax_certificate"
+    | "business_license"
+    | "proof_of_address";
+  documentName: string;
+  documentUrl?: string;
+  uploadedAt: string;
+  isVerified: boolean;
+}
+
+export interface VendorKYC {
+  vendorId: string;
+  // Personal Information
+  firstName: string;
+  lastName: string;
+  dateOfBirth: string;
+  nationality: string;
+  phoneNumber: string;
+  alternativePhone?: string;
+
+  // Business Information
+  businessInfo: BusinessInfo;
+
+  // Bank Account Details
+  bankAccounts: BankAccount[];
+
+  // Identity Verification
+  identityDocument?: IdentityDocument;
+
+  // Business Documents
+  businessDocuments: BusinessDocument[];
+
+  // KYC Status
+  status: "pending" | "in_review" | "verified" | "rejected";
+  submittedAt?: string;
+  verifiedAt?: string;
+  rejectionReason?: string;
+  lastUpdatedAt: string;
+}
+
 // Notification Types
 export type NotificationType = "order" | "inventory" | "system" | "payment";
 
@@ -268,4 +361,135 @@ export interface PaginatedResponse<T> {
 export interface ApiError {
   message: string;
   errors?: Record<string, string[]>;
+}
+
+// Financial Types
+export interface Transaction {
+  id: string;
+  orderId: string;
+  amount: number;
+  commission: number;
+  platformFee: number;
+  netEarnings: number;
+  paymentMethod: string;
+  status: "pending" | "completed" | "failed";
+  createdAt: string;
+  settledAt?: string;
+}
+
+export interface Payout {
+  id: string;
+  amount: number;
+  bankAccount: string;
+  status: "pending" | "processing" | "completed" | "failed";
+  scheduledDate: string;
+  completedDate?: string;
+  reference: string;
+  transactionCount: number;
+}
+
+export interface FinancialSummary {
+  totalEarnings: number;
+  pendingPayouts: number;
+  completedPayouts: number;
+  totalCommission: number;
+  totalFees: number;
+  netEarnings: number;
+  period: string;
+}
+
+export interface Invoice {
+  id: string;
+  invoiceNumber: string;
+  orderId: string;
+  amount: number;
+  tax: number;
+  total: number;
+  issuedDate: string;
+  dueDate: string;
+  status: "draft" | "sent" | "paid" | "overdue";
+  pdfUrl?: string;
+}
+
+// Reports Types
+export interface SalesReport {
+  date: string;
+  totalOrders: number;
+  totalRevenue: number;
+  totalCommission: number;
+  netRevenue: number;
+  averageOrderValue: number;
+}
+
+export interface TaxReport {
+  period: string;
+  totalSales: number;
+  taxableAmount: number;
+  taxCollected: number;
+  taxRate: number;
+}
+
+export interface InventoryReport {
+  productId: string;
+  productName: string;
+  sku: string;
+  currentStock: number;
+  stockValue: number;
+  soldUnits: number;
+  restockNeeded: boolean;
+}
+
+export type ReportPeriod =
+  | "today"
+  | "week"
+  | "month"
+  | "quarter"
+  | "year"
+  | "custom";
+
+// Notification History Types
+export interface NotificationHistory extends Notification {
+  isArchived: boolean;
+  archivedAt?: string;
+  readAt?: string;
+}
+
+export interface NotificationPreferences {
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  soundAlerts: boolean;
+  orderNotifications: boolean;
+  inventoryNotifications: boolean;
+  paymentNotifications: boolean;
+  systemNotifications: boolean;
+}
+
+// Support Types
+export interface SupportTicket {
+  id: string;
+  subject: string;
+  description: string;
+  category: "technical" | "billing" | "product" | "account" | "other";
+  priority: "low" | "medium" | "high" | "urgent";
+  status: "open" | "in_progress" | "resolved" | "closed";
+  createdAt: string;
+  updatedAt: string;
+  responses: TicketResponse[];
+}
+
+export interface TicketResponse {
+  id: string;
+  ticketId: string;
+  message: string;
+  isVendorResponse: boolean;
+  createdAt: string;
+  attachments?: string[];
+}
+
+export interface FAQ {
+  id: string;
+  question: string;
+  answer: string;
+  category: string;
+  helpful: number;
 }

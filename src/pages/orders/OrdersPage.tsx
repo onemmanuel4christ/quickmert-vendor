@@ -5,6 +5,7 @@ import { Card, CardContent } from "../../components/ui/card";
 import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { Input } from "../../components/ui/input";
+import { OrderTimerBadge } from "../../components/common/OrderTimerBadge";
 import type { Order } from "../../types";
 import {
   Search,
@@ -257,6 +258,12 @@ export default function OrdersPage() {
                           <p className="text-xs text-muted-foreground">
                             {order.paymentMethod}
                           </p>
+                          <OrderTimerBadge
+                            createdAt={order.createdAt}
+                            status={order.status}
+                            slaTime={order.slaTime || 20}
+                            compact
+                          />
                         </div>
                       </div>
                     </td>

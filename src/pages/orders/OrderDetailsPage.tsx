@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import {
   Card,
@@ -10,6 +10,9 @@ import { Button } from "../../components/ui/button";
 import { Badge } from "../../components/ui/badge";
 import { mockApi } from "../../services/mockData";
 import { useOrderStore } from "../../stores/orderStore";
+import { useToast } from "../../components/ui/toast";
+import { useOrderTimer, useOrderSLA } from "../../hooks/useOrderTimer";
+import { playUrgentSound } from "../../services/notificationService";
 import type { Order } from "../../types";
 import {
   ArrowLeft,
@@ -20,16 +23,72 @@ import {
   CreditCard,
   CheckCircle,
   Clock,
+  AlertCircle,
+  Check,
+  X,
+  ChefHat,
+  PackageCheck,
 } from "lucide-react";
 import { formatCurrency, formatDate } from "../../lib/utils";
 
 export default function OrderDetailsPage() {
   const { orderId } = useParams<{ orderId: string }>();
   const navigate = useNavigate();
-  const { updateOrderStatus } = useOrderStore();
+  const { acceptOrder, rejectOrder, startPreparation, markAsReady } =
+    useOrderStore();
+  const { toast } = useToast();
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const slaBreachAlerted = useRef(false);
+
+  // Timer hooks
+  const timer = useOrderTimer(
+    order?.createdAt || new Date().toISOString(),
+    order?.slaTime || 20,
+    order?.status || "pending",
+  );
+  const slaStatus = useOrderSLA(
+    order?.createdAt || new Date().toISOString(),
+    order?.slaTime || 20,
+  );
+
+  // Monitor SLA breach and trigger alerts
+  useEffect(() => {
+    if (timer.isOverdue && !slaBreachAlerted.current && order) {
+      slaBreachAlerted.current = true;
+
+      // Play urgent sound alert
+      playUrgentSound();
+
+      // Show toast notification
+      toast({
+        title: "⚠️ SLA Breach!",
+        description: `Order ${order.orderNumber} has exceeded the ${order.slaTime || 20}-minute SLA. Immediate action required!`,
+        variant: "destructive",
+      });
+
+      // Show browser notification if permission granted
+      if (Notification.permission === "granted") {
+        new Notification("⚠️ SLA Breach - Quick Action Required!", {
+          body: `Order ${order.orderNumber} from ${order.customer.name} is overdue by ${timer.totalMinutes - (order.slaTime || 20)} minutes`,
+          icon: "/icon-192.png",
+          badge: "/badge-72.png",
+          tag: `sla-breach-${order.id}`,
+          requireInteraction: true,
+          vibrate: [200, 100, 200, 100, 200],
+        });
+      }
+    }
+
+    // Reset alert flag when order changes or status changes to completed/cancelled
+    if (
+      order &&
+      (order.status === "completed" || order.status === "cancelled")
+    ) {
+      slaBreachAlerted.current = false;
+    }
+  }, [timer.isOverdue, timer.totalMinutes, order, toast]);
 
   useEffect(() => {
     const fetchOrder = async () => {
@@ -47,33 +106,99 @@ export default function OrderDetailsPage() {
     fetchOrder();
   }, [orderId]);
 
-  const handleStatusUpdate = async (newStatus: Order["status"]) => {
+  const handleAccept = async () => {
     if (!order) return;
     setUpdating(true);
     try {
-      const updated = await mockApi.updateOrderStatus(order.id, newStatus);
+      acceptOrder(order.id);
+      const updated = await mockApi.updateOrderStatus(order.id, "accepted");
       setOrder(updated);
-      updateOrderStatus(order.id, newStatus);
+      toast({
+        title: "Order Accepted",
+        description: `Order ${order.orderNumber} has been accepted.`,
+      });
     } catch (error) {
-      console.error("Failed to update order status:", error);
+      console.error("Failed to accept order:", error);
+      toast({
+        title: "Error",
+        description: "Failed to accept order. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setUpdating(false);
     }
   };
 
-  const getNextStatus = (
-    currentStatus: Order["status"],
-  ): Order["status"] | null => {
-    const statusFlow: Record<Order["status"], Order["status"] | null> = {
-      pending: "preparing",
-      accepted: "preparing",
-      preparing: "ready",
-      ready: "handed_to_rider",
-      handed_to_rider: "completed",
-      completed: null,
-      cancelled: null,
-    };
-    return statusFlow[currentStatus];
+  const handleReject = async () => {
+    if (!order) return;
+    const confirmed = confirm("Are you sure you want to reject this order?");
+    if (!confirmed) return;
+
+    setUpdating(true);
+    try {
+      rejectOrder(order.id, "Rejected by vendor");
+      const updated = await mockApi.updateOrderStatus(order.id, "cancelled");
+      setOrder(updated);
+      toast({
+        title: "Order Rejected",
+        description: `Order ${order.orderNumber} has been rejected.`,
+      });
+    } catch (error) {
+      console.error("Failed to reject order:", error);
+      toast({
+        title: "Error",
+        description: "Failed to reject order. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleStartPreparation = async () => {
+    if (!order) return;
+    setUpdating(true);
+    try {
+      startPreparation(order.id);
+      const updated = await mockApi.updateOrderStatus(order.id, "preparing");
+      setOrder(updated);
+      toast({
+        title: "Preparation Started",
+        description: `Preparing order ${order.orderNumber}.`,
+      });
+    } catch (error) {
+      console.error("Failed to start preparation:", error);
+      toast({
+        title: "Error",
+        description: "Failed to start preparation. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  const handleMarkReady = async () => {
+    if (!order) return;
+    setUpdating(true);
+    try {
+      markAsReady(order.id);
+      const updated = await mockApi.updateOrderStatus(order.id, "ready");
+      setOrder(updated);
+      toast({
+        title: "Order Ready",
+        description: `Order ${order.orderNumber} is ready for pickup.`,
+      });
+    } catch (error) {
+      console.error("Failed to mark order as ready:", error);
+      toast({
+        title: "Error",
+        description: "Failed to mark order as ready. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setUpdating(false);
+    }
   };
 
   if (loading || !order) {
@@ -84,11 +209,14 @@ export default function OrderDetailsPage() {
     );
   }
 
-  const nextStatus = getNextStatus(order.status);
+  // Determine which action buttons to show based on status
+  const showAcceptReject = order.status === "pending";
+  const showStartPrep = order.status === "accepted";
+  const showMarkReady = order.status === "preparing";
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between flex-wrap gap-4">
         <div className="flex items-center space-x-4">
           <Button
             variant="ghost"
@@ -104,19 +232,124 @@ export default function OrderDetailsPage() {
             </p>
           </div>
         </div>
-        <Badge
-          variant={
-            order.status === "completed"
-              ? "success"
-              : order.status === "cancelled"
-                ? "destructive"
-                : "warning"
-          }
-          className="text-base px-4 py-2"
-        >
-          {order.status.replace("_", " ")}
-        </Badge>
+
+        <div className="flex items-center gap-3 flex-wrap">
+          {/* Timer Display */}
+          {order.status !== "completed" && order.status !== "cancelled" && (
+            <Card
+              className={`px-4 py-2 ${timer.isOverdue ? "border-red-500 bg-red-50 dark:bg-red-950" : "border-blue-500"}`}
+            >
+              <div className="flex items-center gap-2">
+                {timer.isOverdue ? (
+                  <AlertCircle className="h-5 w-5 text-red-600" />
+                ) : (
+                  <Clock className="h-5 w-5 text-blue-600" />
+                )}
+                <div>
+                  <p
+                    className={`text-sm font-medium ${timer.isOverdue ? "text-red-600" : "text-blue-600"}`}
+                  >
+                    {timer.isOverdue ? "SLA BREACHED" : "Time Elapsed"}
+                  </p>
+                  <p
+                    className={`text-lg font-bold ${timer.isOverdue ? "text-red-700" : ""}`}
+                  >
+                    {timer.formattedTime}
+                  </p>
+                  {!timer.isOverdue && (
+                    <p className="text-xs text-muted-foreground">
+                      SLA: {slaStatus.remaining}min remaining
+                    </p>
+                  )}
+                </div>
+              </div>
+            </Card>
+          )}
+
+          {/* Action Buttons */}
+          {showAcceptReject && (
+            <>
+              <Button
+                onClick={handleReject}
+                variant="destructive"
+                disabled={updating}
+              >
+                <X className="h-4 w-4 mr-2" />
+                Reject Order
+              </Button>
+              <Button
+                onClick={handleAccept}
+                disabled={updating}
+                className="bg-green-600 hover:bg-green-700"
+              >
+                <Check className="h-4 w-4 mr-2" />
+                Accept Order
+              </Button>
+            </>
+          )}
+
+          {showStartPrep && (
+            <Button onClick={handleStartPreparation} disabled={updating}>
+              <ChefHat className="h-4 w-4 mr-2" />
+              Start Preparation
+            </Button>
+          )}
+
+          {showMarkReady && (
+            <Button
+              onClick={handleMarkReady}
+              disabled={updating}
+              className="bg-green-600 hover:bg-green-700"
+            >
+              <PackageCheck className="h-4 w-4 mr-2" />
+              Mark as Ready
+            </Button>
+          )}
+
+          <Badge
+            variant={
+              order.status === "completed"
+                ? "success"
+                : order.status === "cancelled"
+                  ? "destructive"
+                  : "warning"
+            }
+            className="text-base px-4 py-2"
+          >
+            {order.status.replace("_", " ")}
+          </Badge>
+        </div>
       </div>
+
+      {/* SLA Progress Bar */}
+      {order.status !== "completed" && order.status !== "cancelled" && (
+        <Card className={slaStatus.isBreached ? "border-red-500" : ""}>
+          <CardContent className="pt-6">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-medium">SLA Progress</span>
+              <span
+                className={`text-sm font-medium ${slaStatus.isBreached ? "text-red-600" : ""}`}
+              >
+                {slaStatus.isBreached
+                  ? "Overdue"
+                  : `${slaStatus.remaining}min remaining`}
+              </span>
+            </div>
+            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-1000 ${
+                  slaStatus.percentage > 50
+                    ? "bg-green-500"
+                    : slaStatus.percentage > 25
+                      ? "bg-yellow-500"
+                      : "bg-red-500"
+                }`}
+                style={{ width: `${Math.max(0, slaStatus.percentage)}%` }}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 md:grid-cols-3">
         {/* Customer Information */}
@@ -262,41 +495,6 @@ export default function OrderDetailsPage() {
           </div>
         </CardContent>
       </Card>
-
-      {/* Status Actions */}
-      {nextStatus &&
-        order.status !== "completed" &&
-        order.status !== "cancelled" && (
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h3 className="font-semibold mb-1">Update Order Status</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Move this order to the next stage
-                  </p>
-                </div>
-                <Button
-                  onClick={() => handleStatusUpdate(nextStatus)}
-                  disabled={updating}
-                  size="lg"
-                >
-                  {updating ? (
-                    <>
-                      <Clock className="mr-2 h-4 w-4 animate-spin" />
-                      Updating...
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle className="mr-2 h-4 w-4" />
-                      Mark as {nextStatus.replace("_", " ")}
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        )}
     </div>
   );
 }
